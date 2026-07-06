@@ -1,0 +1,14 @@
+{
+  "name": "wijzer",
+  "owner": {
+    "name": "Gerlando Piro",
+    "url": "https://github.com/gpxl"
+  },
+  "plugins": [
+    {
+      "name": "wijzer",
+      "source": "./",
+      "description": "Generate and maintain an OpenWiki-format agent wiki for your codebase, refreshed from git diffs — powered by your Claude subscription, no API keys."
+    }
+  ]
+}

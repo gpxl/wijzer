@@ -1,0 +1,17 @@
+{
+  "name": "wijzer",
+  "version": "0.1.0",
+  "description": "Generate and maintain an OpenWiki-format agent wiki for your codebase, refreshed from git diffs — powered by your Claude subscription, no API keys. Provides /wijzer:init, /wijzer:update, and /wijzer:ask.",
+  "author": {
+    "name": "Gerlando Piro",
+    "url": "https://github.com/gpxl"
+  },
+  "homepage": "https://github.com/gpxl/wijzer",
+  "license": "MIT",
+  "keywords": [
+    "documentation",
+    "wiki",
+    "openwiki",
+    "codebase-docs"
+  ]
+}
