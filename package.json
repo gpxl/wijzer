@@ -1,0 +1,25 @@
+{
+  "name": "wijzer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A Claude Code plugin that generates and maintains an OpenWiki-format agent wiki for your repo — powered by your Claude subscription, no API keys.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "shellcheck scripts/*.sh scripts/lib/*.sh"
+  },
+  "keywords": [
+    "claude-code",
+    "claude-code-plugin",
+    "documentation",
+    "wiki",
+    "openwiki",
+    "agents",
+    "codebase-docs"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "vitest": "^4.1.9"
+  }
+}
