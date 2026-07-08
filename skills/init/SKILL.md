@@ -3,7 +3,7 @@ name: init
 description: Generate the wijzer/OpenWiki wiki for this repository from scratch into openwiki/, then add a pointer block to AGENTS.md / CLAUDE.md. Use when the user runs /wijzer:init or asks to create/bootstrap the repository wiki.
 argument-hint: [focus]
 disable-model-invocation: true
-allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*), Bash(git *), Bash(rg *), Bash(rm -f openwiki/_plan.md), Read, Grep, Glob, Write, Edit, Task
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*), Bash(git log:*), Bash(git show:*), Bash(git diff:*), Bash(git status:*), Bash(git blame:*), Bash(git rev-parse:*), Bash(git rev-list:*), Bash(git cat-file:*), Bash(git ls-files:*), Bash(git shortlog:*), Bash(rg *), Bash(rm -f openwiki/_plan.md), Read, Grep, Glob, Write, Edit, Task
 ---
 
 # /wijzer:init — generate the wiki from scratch
@@ -64,7 +64,22 @@ repo is clearly tiny; merge thin pages rather than shipping stubs.
 rm -f openwiki/_plan.md
 ```
 
-**7. Pointer block.** Point coding agents at the wiki idempotently:
+**7. Parity gate.** Verify the wiki conforms to the format contract before doing
+anything else:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/check-format.sh" --dir .
+```
+
+If `ok` is `false`, the wiki violates `wiki-format.md`. Fix **each** string in
+`problems` directly in the affected pages (broken links, missing `## Start
+here` / `## Documentation map`, frontmatter, malformed `## Source map` /
+`Git evidence:` bullets, a leftover `_plan.md`) and re-run until `ok` is `true`.
+Entries in `warnings` (e.g. the 8-page soft ceiling, a page at the wiki root)
+are judgment calls, not blockers — weigh them but you need not act on them.
+**Do not proceed to the pointer or state steps while the gate reports `ok:false`.**
+
+**8. Pointer block.** Point coding agents at the wiki idempotently:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/inject-pointer.sh" --dir .
@@ -73,7 +88,8 @@ rm -f openwiki/_plan.md
 This creates or appends a marker-delimited block in `AGENTS.md` / `CLAUDE.md`
 (safe to re-run). Report its `results` to the user.
 
-**8. Record state.** Only after the wiki content exists, write the run metadata:
+**9. Record state.** Only after the wiki content exists and the parity gate
+passes, write the run metadata:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/write-state.sh" --dir . --command init --model <your-model-id>
