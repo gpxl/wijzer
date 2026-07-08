@@ -205,12 +205,40 @@ const TRANSLATIONS = [
   { note: "Leading-slash openwiki path.", from: /\/openwiki/g, to: "openwiki" },
 ];
 
-function translate(text) {
-  let out = text;
-  for (const { from, to } of TRANSLATIONS) {
-    out = out.replaceAll(from, to);
+// Fenced ``` code blocks are verbatim literals — most importantly the exact
+// `## OpenWiki` pointer block the agent must reproduce byte-for-byte into a repo's
+// AGENTS.md/CLAUDE.md for an interchangeable wiki. They legitimately contain
+// OpenWiki's own `/openwiki` path, so they are exempt from BOTH vocabulary
+// translation and the residual-vocab guard.
+const FENCE_RE = /```[\s\S]*?```/g;
+
+function withFencesProtected(text, fn) {
+  // A stray/odd ``` marker would mispair, silently exempting a prose span from
+  // both translation and the residual guard — fail loudly instead.
+  const markers = text.match(/```/g) ?? [];
+  if (markers.length % 2 !== 0) {
+    throw new Error(`odd number of \`\`\` fence markers (${markers.length}) — cannot pair`);
+  }
+  // Split into alternating non-fence chunks and the fence blocks between them;
+  // transform only the non-fence chunks, then reassemble in order.
+  const between = text.split(FENCE_RE);
+  const fences = text.match(FENCE_RE) ?? [];
+  let out = "";
+  for (let i = 0; i < between.length; i++) {
+    out += fn(between[i]);
+    if (i < fences.length) out += fences[i];
   }
   return out;
+}
+
+function translate(text) {
+  return withFencesProtected(text, (masked) => {
+    let out = masked;
+    for (const { from, to } of TRANSLATIONS) {
+      out = out.replaceAll(from, to);
+    }
+    return out;
+  });
 }
 
 // Tokens that must NOT survive translation into the doctrine body. This is a
@@ -233,8 +261,9 @@ const RESIDUAL_VOCAB = [
 ];
 
 export function assertNoResidualVocab(text, where) {
+  const stripped = text.replace(FENCE_RE, ""); // verbatim fenced literals are exempt
   for (const token of RESIDUAL_VOCAB) {
-    if (text.includes(token)) {
+    if (stripped.includes(token)) {
       throw new Error(
         `untranslated DeepAgents vocabulary "${token}" survived in ${where} — extend TRANSLATIONS`,
       );
@@ -262,35 +291,6 @@ const SECTIONS = [
   { header: "Required documentation structure:", target: "wikiFormat" },
   { header: "Mode-specific behavior:", target: "disciplines" },
 ];
-
-// Sections whose *write mechanism* differs between OpenWiki and wijzer, so a
-// vocabulary swap is not enough — the derived text would tell the agent to do
-// something wijzer does with a script instead. These get a documented,
-// distribution-method adaptation (body only; the `## <header>` stays). OpenWiki
-// has the agent hand-write an `## OpenWiki` pointer block "every time"; wijzer
-// writes a marker-delimited block deterministically with inject-pointer.sh, so
-// deriving the verbatim block would both contradict the script and (on update)
-// invite duplicate blocks. Keep the parity-relevant rules, replace the mechanism.
-const ADAPTED_SECTIONS = {
-  "Root agent instruction files:": [
-    "*Distribution-method adaptation: OpenWiki has the agent hand-write this",
-    "pointer block; wijzer writes it deterministically with",
-    "[`scripts/inject-pointer.sh`](../scripts/inject-pointer.sh). The parity intent —",
-    "a top-level, idempotent pointer into the wiki — is preserved; the exact",
-    "`## OpenWiki` block OpenWiki embeds here is replaced by the script's",
-    "marker-delimited block.*",
-    "",
-    "- Point coding agents at the wiki from the repository's **top-level**",
-    "  `AGENTS.md` / `CLAUDE.md` — never nested `AGENTS.md`/`CLAUDE.md` files.",
-    "- Do not hand-write the block. Run `scripts/inject-pointer.sh`, which creates",
-    "  or updates a marker-delimited block idempotently (safe to re-run) and",
-    "  preserves the surrounding content.",
-    "- On update runs, re-run `scripts/inject-pointer.sh` so a repository that",
-    "  gained an `AGENTS.md`/`CLAUDE.md` since init picks up the block; it no-ops",
-    "  when the block is already present.",
-    "- Do not make formatting-only edits to these files.",
-  ].join("\n"),
-};
 
 /**
  * Split the trimmed system prompt into { intro, sections{header->body} } and
@@ -391,15 +391,16 @@ filesystem to Claude Code's real tools:
 
 ${rows}
 
-Two sections need more than a vocabulary swap:
+Two more rules beyond the vocabulary swap:
 
 - \`OpenWiki CLI reference:\` is **dropped** — its subject, the \`openwiki\` CLI flag
   surface, is out of wijzer's parity scope, since wijzer's runtime is Claude Code
   skills (\`/wijzer:init\`, \`:update\`, \`:ask\`), not a CLI.
-- \`Root agent instruction files:\` is **adapted** — OpenWiki has the agent
-  hand-write an \`## OpenWiki\` pointer block; wijzer writes a marker-delimited
-  block deterministically with \`scripts/inject-pointer.sh\`, so the parity-relevant
-  rules are kept but the write mechanism and embedded block are replaced.`;
+- Fenced \`\`\`code blocks are **preserved verbatim** — not translated and not
+  residual-vocab-checked. The \`## OpenWiki\` pointer block under "Root agent
+  instruction files" is the exact literal the agent must reproduce byte-for-byte
+  into a repository's AGENTS.md/CLAUDE.md, so it keeps OpenWiki's own \`/openwiki\`
+  path for an interchangeable wiki.`;
 }
 
 function truncate(s, n = 72) {
@@ -441,7 +442,7 @@ function buildDisciplines(intro, sections, modeInstructions, sha) {
     body.push("");
     body.push(headerToMarkdown(header));
     body.push("");
-    body.push(header in ADAPTED_SECTIONS ? ADAPTED_SECTIONS[header] : sections[header]);
+    body.push(sections[header]);
   }
   const translated = translate(body.join("\n"));
   assertNoResidualVocab(translated, "disciplines.md");

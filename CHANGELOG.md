@@ -8,17 +8,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- **Phase 1 — deterministic core.** Plugin scaffold (`.claude-plugin/`), the six
-  bash scripts that own all deterministic bookkeeping (`check-noop`, `snapshot`,
-  `write-state`, `diff-summary`, `inventory`, `inject-pointer`), and a Vitest
-  suite that exercises them against real temporary git repos. `tests/noop.test.ts`
-  is a case-for-case port of OpenWiki's `test/update-noop.test.ts` (the executable
-  parity spec). CI runs shellcheck + tests on macOS and Linux.
+- **Phase 1 — deterministic core.** Plugin scaffold (`.claude-plugin/`), the
+  bash scripts that own the deterministic no-op / snapshot / state bookkeeping
+  (`check-noop`, `snapshot`, `write-state`), and a Vitest suite that exercises
+  them against real temporary git repos. The executable parity spec is OpenWiki's
+  own `test/update-noop.test.ts`, run verbatim from the vendored source, plus
+  `tests/parity-crossvalidate.test.ts` (wijzer's bash vs the real functions). CI
+  runs shellcheck + tests on macOS and Linux. (Phase 1 also shipped `inventory`,
+  `inject-pointer`, and `diff-summary`; P2D removed them — see Changed below.)
 - `PARITY.md` pinning the validated upstream OpenWiki commit and the mapping table.
 - **Phase 2 — init skill.** `/wijzer:init [focus]` (`skills/init/SKILL.md`) that
-  runs the deterministic inventory, optionally fans out read-only `wiki-scout`
+  discovers the repository, optionally fans out read-only `wiki-scout`
   subagents (`agents/wiki-scout.md`), plans via `openwiki/_plan.md`, writes the
-  wiki, injects the `AGENTS.md`/`CLAUDE.md` pointer, and records state. The
+  wiki, adds the `AGENTS.md`/`CLAUDE.md` pointer section, and records state. The
   parity contract is captured in `references/wiki-format.md` (page format, source
   maps, ≤8-page ceiling) and `references/disciplines.md` (run / subagent /
   planning / git / surgical-edit disciplines).
@@ -53,3 +55,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   output rather than its prompt. `references/state-schema.md` stays hand-authored
   (it documents wijzer-only serialization facts) but its field set is now locked
   to the vendored `UpdateMetadata` type by the same test.
+
+### Changed
+
+- **P2D — prompt-driven skills (parity-first).** Removed the three bash scripts
+  that had no OpenWiki counterpart and were wijzer value-adds: `inventory.sh`
+  (repo inventory), `inject-pointer.sh` (marker-block writer), and
+  `diff-summary.sh` (bespoke JSON diff), plus their tests. Discovery, git
+  inspection, and the `AGENTS.md`/`CLAUDE.md` pointer are now **prompt-driven**,
+  matching OpenWiki's own behavior:
+  - `/wijzer:init` and `/wijzer:update` (`skills/init`, `skills/update`) are thin
+    wrappers: they follow the generated run/git disciplines directly and call
+    only the exact-semantics bookkeeping scripts (`check-noop`, `snapshot`,
+    `write-state`, `check-format`). The update skill reads the baseline from
+    `openwiki/.last-update.json` and runs the same `git status`/`log <range>`/`diff`
+    commands and the same `gitHead` → `updatedAt` → recent-history fallback as
+    OpenWiki's `createGitSummary`.
+  - The pointer is written by the agent using OpenWiki's **exact `## OpenWiki`
+    block**, now preserved byte-for-byte in `references/disciplines.md` (fenced
+    literals are exempt from vocabulary translation and the residual-vocab guard).
+    This reverses P2C's inject-pointer.sh adaptation.
+  - `agents/wiki-scout.md` is aligned to the generated subagent discipline.

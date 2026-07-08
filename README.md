@@ -49,13 +49,15 @@ with a subscription OAuth token (`claude setup-token`) — no API key in CI eith
 
 wijzer splits deterministic bookkeeping from model judgment:
 
-- **`scripts/`** — dependency-free bash (git + coreutils) that computes the
-  update no-op verdict, the content snapshot, the diff summary, the repo
-  inventory, the state file, and the pointer injection. Each emits one JSON
-  object; each is unit-tested against real temp git repos (`npm test`).
-- **`skills/` + `agents/`** — the model does discovery, page planning, and
-  writing, consuming the scripts' JSON and obeying the disciplines in
-  `references/`.
+- **`scripts/`** — dependency-free bash (git + coreutils) that owns the
+  exact-semantics bookkeeping: the update no-op verdict (`check-noop`), the
+  content snapshot (`snapshot`), the state file (`write-state`), and the output
+  format gate (`check-format`). Each emits one JSON object; each is unit-tested
+  against real temp git repos (`npm test`).
+- **`skills/` + `agents/`** — the model does discovery, git inspection, page
+  planning, writing, and the `AGENTS.md`/`CLAUDE.md` pointer **prompt-driven**,
+  obeying the disciplines in `references/` (generated from OpenWiki's own prompt)
+  and calling the scripts above for the bookkeeping.
 
 See [PARITY.md](PARITY.md) for exactly what matches OpenWiki and how it's
 verified, and [`CONTRIBUTING`](#contributing) below to hack on it.

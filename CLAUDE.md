@@ -20,8 +20,9 @@ translation, drift-locked by `tests/build-disciplines.test.ts`. Edit the
 generator and re-run it, never the generated files. The format side of parity is gated
 deterministically too: init/update finish by running `scripts/check-format.sh`
 over `openwiki/` and must fix reported problems before recording state. The scripts are unit-tested against real temp
-git repos in **`tests/`** (Vitest); `tests/noop.test.ts` is a case-for-case port
-of OpenWiki's `test/update-noop.test.ts` — the executable parity spec.
+git repos in **`tests/`** (Vitest); the vendored `vendor/openwiki/test/update-noop.test.ts`
+runs verbatim and `tests/parity-crossvalidate.test.ts` runs wijzer's bash against
+the real OpenWiki functions — the executable parity spec.
 
 Interchangeability with OpenWiki means the wiki dir stays `openwiki/` and the
 state file stays `openwiki/.last-update.json` with the exact

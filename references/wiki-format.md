@@ -132,12 +132,13 @@ filesystem to Claude Code's real tools:
 - Leading-slash openwiki path.
   - matches `\/openwiki`
 
-Two sections need more than a vocabulary swap:
+Two more rules beyond the vocabulary swap:
 
 - `OpenWiki CLI reference:` is **dropped** — its subject, the `openwiki` CLI flag
   surface, is out of wijzer's parity scope, since wijzer's runtime is Claude Code
   skills (`/wijzer:init`, `:update`, `:ask`), not a CLI.
-- `Root agent instruction files:` is **adapted** — OpenWiki has the agent
-  hand-write an `## OpenWiki` pointer block; wijzer writes a marker-delimited
-  block deterministically with `scripts/inject-pointer.sh`, so the parity-relevant
-  rules are kept but the write mechanism and embedded block are replaced.
+- Fenced ```code blocks are **preserved verbatim** — not translated and not
+  residual-vocab-checked. The `## OpenWiki` pointer block under "Root agent
+  instruction files" is the exact literal the agent must reproduce byte-for-byte
+  into a repository's AGENTS.md/CLAUDE.md, so it keeps OpenWiki's own `/openwiki`
+  path for an interchangeable wiki.

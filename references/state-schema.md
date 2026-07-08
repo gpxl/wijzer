@@ -7,9 +7,9 @@ or change the field set.
 
 Deterministic ownership: the file is written only by
 [`scripts/write-state.sh`](../scripts/write-state.sh) and read (for `gitHead`) by
-[`scripts/check-noop.sh`](../scripts/check-noop.sh) and
-[`scripts/diff-summary.sh`](../scripts/diff-summary.sh). Skills never hand-write
-it — they call `write-state.sh`.
+[`scripts/check-noop.sh`](../scripts/check-noop.sh), which surfaces the prior
+`stateGitHead` the update skill uses to scope its prompt-driven git inspection.
+Skills never hand-write it — they call `write-state.sh`.
 
 ## Location
 
@@ -86,8 +86,8 @@ Example (non-git directory — `gitHead` absent, model fell back):
 
 ## Reading it back
 
-`check-noop.sh` and `diff-summary.sh` extract `gitHead` with a tolerant `sed`
-(`"gitHead"\s*:\s*"…"`) rather than a JSON parser, so they read files written by
+`check-noop.sh` extracts `gitHead` with a tolerant `sed`
+(`"gitHead"\s*:\s*"…"`) rather than a JSON parser, so it reads files written by
 either tool regardless of whitespace or key order. A file with no `gitHead`
 yields the `"missing previous update git head"` verdict (`checkNoop: true`,
 `noop: false`) — i.e. wijzer treats a stateless or non-git wiki as always worth a

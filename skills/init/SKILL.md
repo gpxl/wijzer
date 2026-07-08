@@ -1,6 +1,6 @@
 ---
 name: init
-description: Generate the wijzer/OpenWiki wiki for this repository from scratch into openwiki/, then add a pointer block to AGENTS.md / CLAUDE.md. Use when the user runs /wijzer:init or asks to create/bootstrap the repository wiki.
+description: Generate the wijzer/OpenWiki wiki for this repository from scratch into openwiki/, then add the OpenWiki pointer section to AGENTS.md / CLAUDE.md. Use when the user runs /wijzer:init or asks to create/bootstrap the repository wiki.
 argument-hint: [focus]
 disable-model-invocation: true
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*), Bash(git log:*), Bash(git show:*), Bash(git diff:*), Bash(git status:*), Bash(git blame:*), Bash(git rev-parse:*), Bash(git rev-list:*), Bash(git cat-file:*), Bash(git ls-files:*), Bash(git shortlog:*), Bash(rg *), Bash(rm -f openwiki/_plan.md), Read, Grep, Glob, Write, Edit, Task
@@ -13,58 +13,53 @@ Build a fresh `openwiki/` wiki for the current repository. Optional focus:
 area (e.g. `auth`, `the billing pipeline`), but still ship a coherent
 whole-repo quickstart.
 
-First read the two doctrine files and follow them throughout — they carry the
-parity contract:
+First read the two doctrine files and follow them throughout — they are
+generated from OpenWiki's own prompt and carry the parity contract:
 
 - `${CLAUDE_PLUGIN_ROOT}/references/wiki-format.md` — exact output format.
 - `${CLAUDE_PLUGIN_ROOT}/references/disciplines.md` — run / subagent / planning /
-  git disciplines and size ceilings.
+  git disciplines, the init mode block, and the exact `## OpenWiki` pointer block.
 
-Deterministic bookkeeping is owned by the bundled scripts — call them, don't
-re-implement them. Each prints one JSON object.
+Discovery and the pointer are **prompt-driven** — you do them yourself by
+following the disciplines. Only the no-op / snapshot / state / format
+bookkeeping is delegated to the bundled scripts; call those, don't re-implement
+them. Each prints one JSON object.
 
 ## Steps
 
-**1. Inventory (cheap discovery).** Run:
+**1. Discover (cheap, prompt-driven).** Follow the **run discipline**: inspect
+the repository tree, package/config manifests, README-style files, entrypoints,
+routing files, and schema files, plus a representative file or two per major
+domain. Use targeted `Grep`/`Glob` by directory and extension (never `**/*` from
+the root); prefer `rg --files` with excludes for `.git`, `node_modules`, `dist`,
+`build`, caches, and `openwiki/`. Use `git log`/`git show`/`git blame` on
+high-signal files to learn *why* the code exists. Do **not** read the whole tree.
+(`git rev-parse` fails outside a git repository — if so, stop and tell the user
+`/wijzer:init` must run inside one.)
 
-```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/inventory.sh" --dir .
-```
-
-This returns `root`, `manifests`, `entrypoints`, `recentCommits`,
-`topExtensions`, and a bounded `sampleFiles` list. Use it as your repo map. If
-it exits non-zero (exit 2 = not a git repository), stop and tell the user
-`/wijzer:init` needs to run inside a git repository.
-
-**2. Targeted discovery.** Following the run discipline, inspect the manifests,
-entrypoints, README-style files, routing, and schema files, plus a
-representative file or two per major domain. Use `git log`/`git show`/`git
-blame` on high-signal files to learn *why* the code exists. Do **not** read the
-whole tree.
-
-**3. Fan out (only if warranted).** For a repo with multiple substantial,
+**2. Fan out (only if warranted).** For a repo with multiple substantial,
 independent domains, launch **1–2** `wiki-scout` subagents (the Task tool with
 `subagent_type: wiki-scout`) with narrow read-only briefs (e.g. "data model",
 "API surface"). Use 3–4 only for a clearly small/medium repo or when the user
 asked for depth. Synthesize their notes yourself — they never write.
 
-**4. Plan.** Write `openwiki/_plan.md` listing the intended pages, the source
+**3. Plan.** Write `openwiki/_plan.md` listing the intended pages, the source
 evidence for each, and open questions. This is temporary.
 
-**5. Generate.** Write `openwiki/quickstart.md` **first** (overview + `## Start
+**4. Generate.** Write `openwiki/quickstart.md` **first** (overview + `## Start
 here` + `## Documentation map` linking every section), then the linked section
 pages under topic subdirectories. Respect the format: plain Markdown, no
 frontmatter, H1 first line, optional `## Source map` with a trailing
 `` Git evidence: commits `abc1234` `` bullet. **At most 8 pages** unless the
 repo is clearly tiny; merge thin pages rather than shipping stubs.
 
-**6. Remove the plan.**
+**5. Remove the plan.**
 
 ```bash
 rm -f openwiki/_plan.md
 ```
 
-**7. Parity gate.** Verify the wiki conforms to the format contract before doing
+**6. Parity gate.** Verify the wiki conforms to the format contract before doing
 anything else:
 
 ```bash
@@ -76,19 +71,22 @@ If `ok` is `false`, the wiki violates `wiki-format.md`. Fix **each** string in
 here` / `## Documentation map`, frontmatter, malformed `## Source map` /
 `Git evidence:` bullets, a leftover `_plan.md`) and re-run until `ok` is `true`.
 Entries in `warnings` (e.g. the 8-page soft ceiling, a page at the wiki root)
-are judgment calls, not blockers — weigh them but you need not act on them.
-**Do not proceed to the pointer or state steps while the gate reports `ok:false`.**
+are judgment calls, not blockers. **Do not proceed to the pointer or state steps
+while the gate reports `ok:false`.**
 
-**8. Pointer block.** Point coding agents at the wiki idempotently:
+**7. Pointer section (prompt-driven).** Following the **root agent instruction
+files** discipline, make the repository's top-level `AGENTS.md` / `CLAUDE.md`
+point at the wiki. Write the **exact `## OpenWiki` section** from
+`references/disciplines.md`, verbatim (it is byte-for-byte interchangeable with
+OpenWiki's own output):
+- Only top-level `AGENTS.md` / `CLAUDE.md` — never nested ones.
+- If a file exists, add the `## OpenWiki` section (or update a stale one); if
+  both exist, add the same section to both. If neither exists, create top-level
+  `AGENTS.md` containing only that section.
+- Preserve surrounding content; never duplicate an existing `## OpenWiki`
+  section, and do not make formatting-only edits.
 
-```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/inject-pointer.sh" --dir .
-```
-
-This creates or appends a marker-delimited block in `AGENTS.md` / `CLAUDE.md`
-(safe to re-run). Report its `results` to the user.
-
-**9. Record state.** Only after the wiki content exists and the parity gate
+**8. Record state.** Only after the wiki content exists and the parity gate
 passes, write the run metadata:
 
 ```bash
@@ -103,5 +101,5 @@ script records the `claude-code` fallback. This writes
 ## Finish
 
 Give the user a short summary: the pages created (with their paths), which
-`AGENTS.md`/`CLAUDE.md` files were touched, and any open questions the wiki
+`AGENTS.md`/`CLAUDE.md` files you touched, and any open questions the wiki
 flags. Do not paste subagent notes or the deleted plan.
