@@ -46,7 +46,7 @@ const OUT = {
  * two escapes the vendored prompt actually uses: \` and \\). Returns the cooked
  * text and the index just past the closing backtick.
  */
-function readTemplate(src, openIdx) {
+export function readTemplate(src, openIdx) {
   let raw = "";
   let i = openIdx + 1;
   for (; i < src.length; i++) {
@@ -64,7 +64,7 @@ function readTemplate(src, openIdx) {
 }
 
 /** The single template literal returned by `functionName` in prompt.ts. */
-function extractSingleTemplate(src, functionName) {
+export function extractSingleTemplate(src, functionName) {
   const at = src.indexOf(`export function ${functionName}`);
   if (at < 0) throw new Error(`${functionName} not found in prompt.ts`);
   const ret = src.indexOf("return `", at);
@@ -73,7 +73,7 @@ function extractSingleTemplate(src, functionName) {
 }
 
 /** Every template literal returned inside `functionName`, in source order. */
-function extractAllTemplates(src, functionName) {
+export function extractAllTemplates(src, functionName) {
   const at = src.indexOf(`export function ${functionName}`);
   if (at < 0) throw new Error(`${functionName} not found in prompt.ts`);
   // Bound the search to this function body (up to the next top-level export).
@@ -93,7 +93,7 @@ function extractAllTemplates(src, functionName) {
 
 // --- Constant substitution -------------------------------------------------
 
-function readConstants(src) {
+export function readConstants(src) {
   const dir = src.match(/OPEN_WIKI_DIR\s*=\s*"([^"]+)"/);
   if (!dir) throw new Error("OPEN_WIKI_DIR not found in constants.ts");
   const OPEN_WIKI_DIR = dir[1];
@@ -108,7 +108,7 @@ function readConstants(src) {
  * interpolation left over is a loud failure: OpenWiki added a dynamic piece this
  * generator does not understand, so a human must extend it.
  */
-function substitute(text, consts) {
+export function substitute(text, consts) {
   let out = text
     .replaceAll("${OPEN_WIKI_DIR}", consts.OPEN_WIKI_DIR)
     .replaceAll("${UPDATE_METADATA_PATH}", consts.UPDATE_METADATA_PATH)
@@ -232,7 +232,7 @@ const RESIDUAL_VOCAB = [
   "/Users/",
 ];
 
-function assertNoResidualVocab(text, where) {
+export function assertNoResidualVocab(text, where) {
   for (const token of RESIDUAL_VOCAB) {
     if (text.includes(token)) {
       throw new Error(
@@ -297,7 +297,7 @@ const ADAPTED_SECTIONS = {
  * assert the header set is exactly SECTIONS (order included) and that no text is
  * lost — join(all parts) must reproduce the input.
  */
-function splitSections(systemPrompt) {
+export function splitSections(systemPrompt) {
   const lines = systemPrompt.split("\n");
   const headerSet = new Set(SECTIONS.map((s) => s.header));
   const parts = []; // { header|null, lines[] }
@@ -531,10 +531,14 @@ function buildWikiFormat(sections, sha) {
 
 // --- Entry -----------------------------------------------------------------
 
-export function generate() {
-  const promptSrc = readFileSync(PROMPT_TS, "utf8");
-  const constantsSrc = readFileSync(CONSTANTS_TS, "utf8");
-  const provenance = readFileSync(PROVENANCE, "utf8");
+// `sources` lets tests inject crafted prompt/constants/provenance strings to
+// exercise the fail-loud guards (mode-template count, section drift, residual
+// vocab) without a fixture repo. Called with no args in production, it reads the
+// real vendored files, so the drift-lock behavior is unchanged.
+export function generate(sources = {}) {
+  const promptSrc = sources.promptSrc ?? readFileSync(PROMPT_TS, "utf8");
+  const constantsSrc = sources.constantsSrc ?? readFileSync(CONSTANTS_TS, "utf8");
+  const provenance = sources.provenance ?? readFileSync(PROVENANCE, "utf8");
   const sha = provenance.match(/\b([0-9a-f]{40})\b/)?.[1];
   if (!sha) throw new Error("no pinned SHA in vendor/openwiki/PROVENANCE.md");
 
