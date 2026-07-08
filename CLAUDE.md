@@ -12,7 +12,12 @@ Deterministic bookkeeping lives in **`scripts/`** (dependency-free bash: git +
 coreutils); each script emits one JSON object on stdout (exit 0 = ran, 2 =
 precondition missing). Model judgment lives in **`skills/`** (`/wijzer:init`,
 `:update`, `:ask`) and **`agents/`** (`wiki-scout`, read-only fan-out). Shared
-doctrine is in **`references/`**. The format side of parity is gated
+doctrine is in **`references/`** — and `disciplines.md` + `wiki-format.md` are
+**generated**, not hand-written: `scripts/build-disciplines.mjs` (dev/CI-only
+Node, the one exception to the dependency-free-bash rule; never run by users)
+derives them from the vendored OpenWiki prompt via a documented tool-vocabulary
+translation, drift-locked by `tests/build-disciplines.test.ts`. Edit the
+generator and re-run it, never the generated files. The format side of parity is gated
 deterministically too: init/update finish by running `scripts/check-format.sh`
 over `openwiki/` and must fix reported problems before recording state. The scripts are unit-tested against real temp
 git repos in **`tests/`** (Vitest); `tests/noop.test.ts` is a case-for-case port

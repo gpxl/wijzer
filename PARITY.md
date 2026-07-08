@@ -34,7 +34,7 @@ living record of what that means and how it is verified.
 | surgical edits: ≤1–2 pages when <5 files changed | `references/disciplines.md` + `scripts/diff-summary.sh` | Phase-3 scenario |
 | SHA-256 snapshot; write state only if content changed | `scripts/snapshot.sh` (`dir:`/`file:` frames match real byte-for-byte) + update-skill gate | `tests/snapshot.test.ts` (envelope) + `tests/parity-crossvalidate.test.ts` (digest equals real) |
 | init: inventory → `_plan.md` → generate → delete plan → state | `scripts/inventory.sh` + init skill | golden run |
-| run/subagent/planning/git disciplines (`src/agent/prompt.ts`) | `references/disciplines.md` + `agents/wiki-scout.md` | prompt review (this doc) |
+| run/subagent/planning/git disciplines (`src/agent/prompt.ts`) | `references/disciplines.md` + `references/wiki-format.md` (both **generated** from the vendored `prompt.ts` by `scripts/build-disciplines.mjs`) + `agents/wiki-scout.md` | `tests/build-disciplines.test.ts` — drift-locked: the committed docs must equal a fresh regenerate, so an upstream prompt change fails CI until re-derived |
 | idempotent AGENTS.md/CLAUDE.md block | `scripts/inject-pointer.sh` | `tests/inject.test.ts` |
 | GH Action: cron 8am → update → PR `openwiki/update` | `examples/github-action.yml` (via anthropics/claude-code-action, subscription OAuth) | Phase-4 live run |
 
@@ -56,15 +56,22 @@ living record of what that means and how it is verified.
    `PROVENANCE.md`); the diff of that directory *is* the upstream change to
    review (`test/update-noop.test.ts`, `src/agent/utils.ts`, `src/agent/prompt.ts`,
    `src/constants.ts`, `src/agent/types.ts`).
-2. Run `npm test` — must be green on macOS + Linux. `tests/parity-crossvalidate.test.ts`
-   executes wijzer's bash against the newly-vendored real functions, and the
-   vendored `test/update-noop.test.ts` runs verbatim. Any divergence is either a
+2. Re-derive the prompt-driven doctrine: `node scripts/build-disciplines.mjs`.
+   If `prompt.ts` changed, this rewrites `references/disciplines.md` and
+   `references/wiki-format.md`; review the diff (it *is* the discipline change),
+   extend the translation table in the script if OpenWiki introduced new
+   virtual-filesystem vocabulary (the residual-vocab guard fails loudly on
+   anything untranslated), and commit the regenerated docs.
+3. Run `npm test` — must be green on macOS + Linux. `tests/parity-crossvalidate.test.ts`
+   executes wijzer's bash against the newly-vendored real functions, the vendored
+   `test/update-noop.test.ts` runs verbatim, and `tests/build-disciplines.test.ts`
+   fails until the derived docs above are re-committed. Any divergence is either a
    new intended distribution-method delta (document it inline) or a bash bug to
    fix. No hand-porting of test cases is required — the spec test *is* the vendored
    test.
-3. If the wiki format or a prompt discipline changed, run a golden `init` and
+4. If the wiki format or a prompt discipline changed, run a golden `init` and
    diff the structure against the new upstream `openwiki/`.
-4. Bump the **Upstream validated against** SHA above (it must match
+5. Bump the **Upstream validated against** SHA above (it must match
    `vendor/openwiki/PROVENANCE.md`, enforced by `tests/vendor-openwiki.test.ts`)
    and note the change in `CHANGELOG.md`.
 

@@ -37,3 +37,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   skill frontmatter, read-only guarantees for `ask`/`wiki-scout`, that every
   bundled path a skill references exists, and that `parity-watch` pins the same
   SHA as `PARITY.md`.
+- **Generated doctrine (drift-locked to the real prompt).**
+  `scripts/build-disciplines.mjs` (dev/CI only — never run by users) derives
+  `references/disciplines.md` and `references/wiki-format.md` from the vendored
+  OpenWiki system prompt (`vendor/openwiki/src/agent/prompt.ts`) via a documented
+  tool-vocabulary translation (DeepAgents virtual filesystem → Claude Code
+  `Read`/`Grep`/`Glob`/`Write`/`Edit`/`Bash`, the `task` tool → `Task` +
+  `wiki-scout`, `/openwiki/…` → `openwiki/…`); OpenWiki's out-of-scope CLI-flag
+  section is dropped. `tests/build-disciplines.test.ts` drift-locks the committed
+  docs to a fresh regenerate, so an upstream prompt change fails CI until
+  re-derived — replacing the former manual "prompt review" parity check. The
+  reverse-engineered output-format literals (`## Source map`, the `Git evidence:`
+  7-char-hash bullet, the no-frontmatter and quickstart-heading rules) are carried
+  as a labelled generator constant, since they come from OpenWiki's rendered
+  output rather than its prompt. `references/state-schema.md` stays hand-authored
+  (it documents wijzer-only serialization facts) but its field set is now locked
+  to the vendored `UpdateMetadata` type by the same test.
