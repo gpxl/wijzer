@@ -12,7 +12,9 @@ Deterministic bookkeeping lives in **`scripts/`** (dependency-free bash: git +
 coreutils); each script emits one JSON object on stdout (exit 0 = ran, 2 =
 precondition missing). Model judgment lives in **`skills/`** (`/wijzer:init`,
 `:update`, `:ask`) and **`agents/`** (`wiki-scout`, read-only fan-out). Shared
-doctrine is in **`references/`**. The scripts are unit-tested against real temp
+doctrine is in **`references/`**. The format side of parity is gated
+deterministically too: init/update finish by running `scripts/check-format.sh`
+over `openwiki/` and must fix reported problems before recording state. The scripts are unit-tested against real temp
 git repos in **`tests/`** (Vitest); `tests/noop.test.ts` is a case-for-case port
 of OpenWiki's `test/update-noop.test.ts` — the executable parity spec.
 
@@ -38,6 +40,7 @@ state file stays `openwiki/.last-update.json` with the exact
 | test_pattern | `scripts/<name>.sh` → `tests/<name>.test.ts` |
 | branch_pattern | `claude/<description>` (off `origin/main`) |
 | pr_merge_strategy | squash + delete branch |
+| pr_automerge | on green — pr-monitor merges feature PRs automatically once all CI checks pass (squash + delete branch); no human approval gate |
 
 ## Conventions
 

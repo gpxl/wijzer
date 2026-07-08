@@ -3,7 +3,7 @@ name: update
 description: Refresh the wijzer/OpenWiki wiki from what changed in the repository since the last run, making surgical edits and no-opping cleanly when nothing meaningful changed. Use when the user runs /wijzer:update or asks to refresh/sync the wiki. Supports --dry-run to preview without writing.
 argument-hint: [--dry-run] [instruction]
 disable-model-invocation: true
-allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*), Bash(git *), Bash(rg *), Bash(rm -f openwiki/_plan.md), Read, Grep, Glob, Write, Edit, Task
+allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*), Bash(git log:*), Bash(git show:*), Bash(git diff:*), Bash(git status:*), Bash(git blame:*), Bash(git rev-parse:*), Bash(git rev-list:*), Bash(git cat-file:*), Bash(git ls-files:*), Bash(git shortlog:*), Bash(rg *), Bash(rm -f openwiki/_plan.md), Read, Grep, Glob, Write, Edit, Task
 ---
 
 # /wijzer:update — refresh the wiki from recent changes
@@ -85,14 +85,28 @@ Compare to the step-3 `digest`:
   runs don't churn a PR. Report "wiki already accurate — no changes".
 - **Changed** → continue to step 6.
 
-**6. Pointer block.** Re-run the idempotent injector (picks up a newly added
+**6. Parity gate.** Now that content actually changed, verify it still conforms
+to the format contract:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/check-format.sh" --dir .
+```
+
+If `ok` is `false`, fix **each** string in `problems` in the affected pages
+(broken links, missing quickstart linking headings, frontmatter, malformed
+`## Source map` / `Git evidence:` bullets) and re-run until `ok` is `true`;
+`warnings` are judgment calls, not blockers. **Do not run the pointer or state
+steps while the gate reports `ok:false`.** (This gate does not run in the
+`--dry-run` or no-op paths — those already stopped above.)
+
+**7. Pointer block.** Re-run the idempotent injector (picks up a newly added
 `AGENTS.md`/`CLAUDE.md`, no-ops otherwise):
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/inject-pointer.sh" --dir .
 ```
 
-**7. Record state.**
+**8. Record state.**
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/scripts/write-state.sh" --dir . --command update --model <your-model-id>

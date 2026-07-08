@@ -1,8 +1,14 @@
 ---
 name: wiki-scout
 description: Read-only repository discovery agent for wijzer. Fans out during /wijzer:init and /wijzer:update to inspect one domain of a codebase — source, docs, data model, API surface, integrations, tests, or git history — and returns concise findings with source paths and open questions. Never writes files.
-model: claude-sonnet-4-6
+model: sonnet
 effort: medium
+# Agent `tools:` frontmatter accepts only bare tool names — it does not support
+# per-command permission specifiers (e.g. `Bash(git log:*)`), unlike a skill's
+# `allowed-tools`. So Bash cannot be narrowed to a non-mutating git subset here;
+# the read-only constraint below (and the plain-git commands the brief needs) is
+# what keeps this scout non-mutating. If Claude Code later supports restricted
+# Bash specifiers in agent `tools:`, tighten this to the git read subset.
 tools: Read, Grep, Glob, Bash
 ---
 
