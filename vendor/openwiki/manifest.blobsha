@@ -1,0 +1,6 @@
+14fac913ccf80234b1848540089a3bbcb6e5283d  LICENSE
+8a1bcae1d709113cef50968683191867a66f87a7  src/agent/prompt.ts
+dc1414e22cbf4dda0eb24950d8246ce56518e6c3  src/agent/types.ts
+01a9105dc5d939f2d11010752ac86775f69ad8e3  src/agent/utils.ts
+dfa330f6ed25ab97c1bbc2148c26dfcdd93711b2  src/constants.ts
+aaddad300c03cc17c27eb482c8662ace304bb34c  test/update-noop.test.ts

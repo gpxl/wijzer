@@ -1,0 +1,417 @@
+// Vendored from langchain-ai/openwiki @ 23428de0cc0b1b6d3e5d09be413e92a5d6ee451f
+// Source: src/agent/utils.ts (https://github.com/langchain-ai/openwiki/blob/23428de0cc0b1b6d3e5d09be413e92a5d6ee451f/src/agent/utils.ts)
+// Upstream license: MIT — see vendor/openwiki/LICENSE.
+// SPDX-License-Identifier: MIT
+// DO NOT EDIT — regenerate via scripts/vendor-openwiki.sh.
+import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { promisify } from "node:util";
+import { OPEN_WIKI_DIR, UPDATE_METADATA_PATH } from "../constants.js";
+import type {
+  OpenWikiCommand,
+  OpenWikiRunOptions,
+  RunContext,
+  UpdateMetadata,
+} from "./types.js";
+import type { Dirent } from "node:fs";
+
+const execFileAsync = promisify(execFile);
+
+export type OpenWikiContentSnapshot = string;
+
+export type UpdateNoopStatus =
+  | {
+      shouldSkip: true;
+      gitHead: string;
+      model: string;
+    }
+  | {
+      shouldSkip: false;
+      reason: string;
+    };
+
+/**
+ * Builds the per-run context the prompt uses to reason about prior docs and git changes.
+ */
+export async function createRunContext(
+  command: OpenWikiCommand,
+  cwd: string,
+): Promise<RunContext> {
+  const lastUpdate = await readLastUpdate(cwd);
+
+  if (command === "chat") {
+    return {
+      lastUpdate,
+      gitSummary: "Not applicable for chat.",
+    };
+  }
+
+  return {
+    lastUpdate,
+    gitSummary: await createGitSummary(command, cwd, lastUpdate),
+  };
+}
+
+export async function getUpdateNoopStatus(
+  cwd: string,
+): Promise<UpdateNoopStatus> {
+  const lastUpdate = await readLastUpdate(cwd);
+
+  if (!lastUpdate?.gitHead) {
+    return { shouldSkip: false, reason: "missing previous update git head" };
+  }
+
+  const head = await getGitHead(cwd);
+
+  if (!head) {
+    return { shouldSkip: false, reason: "missing current git head" };
+  }
+
+  const status = await runGit(cwd, [
+    "status",
+    "--short",
+    "--untracked-files=all",
+  ]);
+  const meaningfulStatus = status
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .filter((line) => !isUpdateMetadataStatusLine(line));
+
+  if (meaningfulStatus.length > 0) {
+    return { shouldSkip: false, reason: "worktree has changes" };
+  }
+
+  if (head !== lastUpdate.gitHead) {
+    const committedPaths = await getChangedPathsSinceLastUpdate(
+      cwd,
+      lastUpdate.gitHead,
+    );
+
+    if (
+      committedPaths.length === 0 ||
+      committedPaths.some((changedPath) => !isOpenWikiPath(changedPath))
+    ) {
+      return { shouldSkip: false, reason: "git head changed" };
+    }
+  }
+
+  return {
+    shouldSkip: true,
+    gitHead: head,
+    model: lastUpdate.model,
+  };
+}
+
+export function shouldCheckUpdateNoop(options: OpenWikiRunOptions): boolean {
+  return !options.userMessage?.trim();
+}
+
+/**
+ * Records a successful init/update run so future updates can diff from this git head.
+ */
+export async function writeLastUpdateMetadata(
+  command: OpenWikiCommand,
+  cwd: string,
+  modelId: string,
+): Promise<void> {
+  const metadataFile = path.join(cwd, UPDATE_METADATA_PATH);
+  const metadata: UpdateMetadata = {
+    updatedAt: new Date().toISOString(),
+    command,
+    gitHead: await getGitHead(cwd),
+    model: modelId,
+  };
+
+  await mkdir(path.dirname(metadataFile), { recursive: true });
+  await writeFile(
+    metadataFile,
+    `${JSON.stringify(metadata, null, 2)}\n`,
+    "utf8",
+  );
+}
+
+/**
+ * Hashes OpenWiki content, excluding run metadata, to detect real documentation changes.
+ */
+export async function createOpenWikiContentSnapshot(
+  cwd: string,
+): Promise<OpenWikiContentSnapshot> {
+  const openWikiDir = path.join(cwd, OPEN_WIKI_DIR);
+  const hash = createHash("sha256");
+
+  await addDirectoryToSnapshot(hash, openWikiDir, "");
+
+  return hash.digest("hex");
+}
+
+/**
+ * Reads prior run metadata if it exists and is structurally valid.
+ */
+async function readLastUpdate(cwd: string): Promise<UpdateMetadata | null> {
+  const metadataFile = path.join(cwd, UPDATE_METADATA_PATH);
+
+  try {
+    const rawMetadata = await readFile(metadataFile, "utf8");
+    const parsedMetadata = JSON.parse(rawMetadata) as Partial<UpdateMetadata>;
+
+    if (
+      typeof parsedMetadata.updatedAt === "string" &&
+      typeof parsedMetadata.command === "string" &&
+      typeof parsedMetadata.model === "string"
+    ) {
+      return {
+        updatedAt: parsedMetadata.updatedAt,
+        command: parsedMetadata.command === "init" ? "init" : "update",
+        gitHead:
+          typeof parsedMetadata.gitHead === "string"
+            ? parsedMetadata.gitHead
+            : undefined,
+        model: parsedMetadata.model,
+      };
+    }
+
+    return null;
+  } catch (error) {
+    if (isFileNotFoundError(error) || error instanceof SyntaxError) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * Recursively adds stable file paths and bytes to the OpenWiki content snapshot.
+ */
+async function addDirectoryToSnapshot(
+  hash: ReturnType<typeof createHash>,
+  directory: string,
+  relativeDirectory: string,
+): Promise<void> {
+  let entries: Dirent[];
+
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if (isExpectedSnapshotRaceError(error)) {
+      hash.update("missing");
+      return;
+    }
+
+    throw error;
+  }
+
+  for (const entry of entries.sort((left, right) =>
+    left.name.localeCompare(right.name),
+  )) {
+    const entryPath = path.join(directory, entry.name);
+    const relativePath = path.join(relativeDirectory, entry.name);
+
+    if (relativePath === path.basename(UPDATE_METADATA_PATH)) {
+      continue;
+    }
+
+    if (entry.isDirectory()) {
+      hash.update(`dir:${relativePath}\0`);
+      await addDirectoryToSnapshot(hash, entryPath, relativePath);
+      continue;
+    }
+
+    if (!entry.isFile()) {
+      continue;
+    }
+
+    const fileContent = await readSnapshotFile(entryPath);
+
+    if (fileContent === null) {
+      continue;
+    }
+
+    hash.update(`file:${relativePath}\0`);
+    hash.update(fileContent);
+    hash.update("\0");
+  }
+}
+
+/**
+ * Reads snapshot bytes while tolerating files that move mid-scan.
+ */
+async function readSnapshotFile(filePath: string): Promise<Buffer | null> {
+  try {
+    return await readFile(filePath);
+  } catch (error) {
+    if (isExpectedSnapshotRaceError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * Produces the git evidence block passed to init/update prompts.
+ */
+async function createGitSummary(
+  command: OpenWikiCommand,
+  cwd: string,
+  lastUpdate: UpdateMetadata | null,
+): Promise<string> {
+  const sections: string[] = [];
+  const status = await runGit(cwd, ["status", "--short"]);
+  const head = await getGitHead(cwd);
+
+  sections.push(formatGitSection("git status --short", status));
+  sections.push(formatGitSection("git rev-parse HEAD", head ?? "(unknown)"));
+
+  if (command === "update" && lastUpdate?.gitHead) {
+    const logSinceLastHead = await runGit(cwd, [
+      "log",
+      `${lastUpdate.gitHead}..HEAD`,
+      "--name-status",
+      "--oneline",
+    ]);
+
+    sections.push(
+      formatGitSection(
+        `git log ${lastUpdate.gitHead}..HEAD --name-status --oneline`,
+        logSinceLastHead,
+      ),
+    );
+  } else if (command === "update" && lastUpdate?.updatedAt) {
+    const logSinceLastUpdate = await runGit(cwd, [
+      "log",
+      "--since",
+      lastUpdate.updatedAt,
+      "--name-status",
+      "--oneline",
+    ]);
+
+    sections.push(
+      formatGitSection(
+        `git log --since ${lastUpdate.updatedAt} --name-status --oneline`,
+        logSinceLastUpdate,
+      ),
+    );
+  } else {
+    const recentLog = await runGit(cwd, [
+      "log",
+      "--max-count=20",
+      "--name-status",
+      "--oneline",
+    ]);
+
+    if (command === "update") {
+      sections.push("No prior OpenWiki update timestamp was found.");
+    }
+
+    sections.push(
+      formatGitSection(
+        "git log --max-count=20 --name-status --oneline",
+        recentLog,
+      ),
+    );
+  }
+
+  const diff = await runGit(cwd, ["diff", "--name-status", "HEAD"]);
+  sections.push(formatGitSection("git diff --name-status HEAD", diff));
+
+  return sections.join("\n\n");
+}
+
+async function getGitHead(cwd: string): Promise<string | undefined> {
+  const head = await runGit(cwd, ["rev-parse", "HEAD"]);
+
+  return head.length > 0 ? head : undefined;
+}
+
+/**
+ * Runs git commands without failing the whole run for normal git command errors.
+ */
+async function runGit(cwd: string, args: string[]): Promise<string> {
+  try {
+    const { stdout, stderr } = await execFileAsync(
+      "git",
+      ["--no-pager", ...args],
+      {
+        cwd,
+        maxBuffer: 1024 * 1024,
+      },
+    );
+
+    return [stdout.trim(), stderr.trim()].filter(Boolean).join("\n").trim();
+  } catch (error) {
+    if (isExecError(error)) {
+      return [error.stdout?.trim(), error.stderr?.trim()]
+        .filter(Boolean)
+        .join("\n")
+        .trim();
+    }
+
+    throw error;
+  }
+}
+
+function formatGitSection(command: string, output: string): string {
+  return [`$ ${command}`, output.length > 0 ? output : "(no output)"].join(
+    "\n",
+  );
+}
+
+function isUpdateMetadataStatusLine(line: string): boolean {
+  const statusPath = line.length > 3 ? line.slice(3).trim() : line.trim();
+  const normalizedPath = statusPath.replace(/\\/gu, "/");
+
+  return (
+    normalizedPath === UPDATE_METADATA_PATH ||
+    normalizedPath.endsWith(` -> ${UPDATE_METADATA_PATH}`)
+  );
+}
+
+async function getChangedPathsSinceLastUpdate(
+  cwd: string,
+  gitHead: string,
+): Promise<string[]> {
+  const diff = await runGit(cwd, ["diff", "--name-only", `${gitHead}..HEAD`]);
+
+  return diff
+    .split("\n")
+    .map((line) => normalizeGitPath(line))
+    .filter(Boolean);
+}
+
+function isOpenWikiPath(changedPath: string): boolean {
+  return (
+    changedPath === OPEN_WIKI_DIR || changedPath.startsWith(`${OPEN_WIKI_DIR}/`)
+  );
+}
+
+function normalizeGitPath(value: string): string {
+  return value.trim().replace(/\\/gu, "/");
+}
+
+function isFileNotFoundError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    (error as NodeJS.ErrnoException).code === "ENOENT"
+  );
+}
+
+function isExpectedSnapshotRaceError(error: unknown): boolean {
+  if (!(error instanceof Error) || !("code" in error)) {
+    return false;
+  }
+
+  return ["EISDIR", "ENOENT", "ENOTDIR"].includes(
+    (error as NodeJS.ErrnoException).code ?? "",
+  );
+}
+
+function isExecError(
+  error: unknown,
+): error is Error & { stdout?: string; stderr?: string } {
+  return error instanceof Error && ("stdout" in error || "stderr" in error);
+}
