@@ -58,11 +58,25 @@ describe("generated disciplines + wiki-format (drift-locked to prompt.ts)", () =
 
   test("no DeepAgents virtual-fs vocabulary survives in either doc body", () => {
     for (const rel of ["references/disciplines.md", "references/wiki-format.md"]) {
-      const text = body(read(rel));
+      // Fenced blocks are verbatim literals (e.g. the `## OpenWiki` pointer block,
+      // which keeps OpenWiki's own `/openwiki` path); the generator exempts them,
+      // so strip them here before checking translated prose.
+      const text = body(read(rel)).replace(/```[\s\S]*?```/g, "");
       for (const token of RESIDUAL_VOCAB) {
         expect(text, `"${token}" leaked into ${rel}`).not.toContain(token);
       }
     }
+  });
+
+  test("the AGENTS.md/CLAUDE.md pointer block is derived verbatim (agent writes it)", () => {
+    // P2D: no bash injector — the agent reproduces OpenWiki's exact block, so it
+    // must appear byte-for-byte in the doctrine, including OpenWiki's `/openwiki`.
+    const d = read("references/disciplines.md");
+    expect(d).toContain("## Root agent instruction files");
+    expect(d).toContain("This repository has documentation located in the /openwiki directory.");
+    expect(d).toContain("[OpenWiki quickstart](openwiki/quickstart.md)");
+    // And the old inject-pointer.sh adaptation must be gone.
+    expect(d).not.toContain("inject-pointer.sh");
   });
 
   test("Claude Code tool vocabulary is present (translation actually fired)", () => {

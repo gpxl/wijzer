@@ -80,6 +80,31 @@ describe("skills", () => {
     expect(all.length).toBeGreaterThan(0);
   });
 
+  test("P2D: the removed value-add scripts stay gone and unreferenced", async () => {
+    // inventory/inject-pointer/diff-summary had no OpenWiki counterpart; P2D made
+    // discovery, the pointer, and git inspection prompt-driven. Guard against a
+    // regression that reintroduces a script or a skill reference to one.
+    const removed = ["inventory.sh", "inject-pointer.sh", "diff-summary.sh"];
+    for (const s of removed) {
+      expect(existsSync(p("scripts", s)), `scripts/${s} should be removed`).toBe(false);
+    }
+    for (const name of SKILLS) {
+      const md = await read("skills", name, "SKILL.md");
+      for (const s of removed) {
+        expect(md, `skills/${name} still references ${s}`).not.toContain(s);
+      }
+    }
+  });
+
+  test("init/update discover and write the pointer prompt-driven (no bash injector)", async () => {
+    for (const name of ["init", "update"] as const) {
+      const md = await read("skills", name, "SKILL.md");
+      expect(md, `${name} should be prompt-driven`).toMatch(/prompt-driven/i);
+      // The pointer step names the exact ## OpenWiki section, not a script.
+      expect(md).toContain("## OpenWiki");
+    }
+  });
+
   test("ask is structurally read-only (no write/edit/bash tools)", async () => {
     const md = await read("skills", "ask", "SKILL.md");
     const { fm } = splitFrontmatter(md);

@@ -58,22 +58,27 @@ Use only the tools available to you. Prefer built-in discovery tools such as `Gl
 
 ## Root agent instruction files
 
-*Distribution-method adaptation: OpenWiki has the agent hand-write this
-pointer block; wijzer writes it deterministically with
-[`scripts/inject-pointer.sh`](../scripts/inject-pointer.sh). The parity intent —
-a top-level, idempotent pointer into the wiki — is preserved; the exact
-`## OpenWiki` block OpenWiki embeds here is replaced by the script's
-marker-delimited block.*
+- Unless the user explicitly asks you not to, always make sure the repository's top-level agent instruction files reference the OpenWiki quickstart.
+- Only consider top-level AGENTS.md and CLAUDE.md for this step. Do not edit nested AGENTS.md or CLAUDE.md files.
+- If AGENTS.md or CLAUDE.md exists, add or update the OpenWiki reference section there. If both exist, ensure the same section is added to both (duplicated).
+- If neither exists, create top-level AGENTS.md containing only the OpenWiki reference section.
+- During update runs, inspect any existing OpenWiki reference section in AGENTS.md and/or CLAUDE.md and refresh it only if the section is missing or semantically stale. This check is required even when the wiki itself is otherwise current.
+- Preserve surrounding instructions in existing files. Replace/update an existing OpenWiki reference section instead of adding duplicates.
+- Do not edit AGENTS.md or CLAUDE.md only to normalize formatting, blank lines, wrapping, or punctuation if the existing OpenWiki section is already semantically correct.
+- Use this exact section structure every time:
 
-- Point coding agents at the wiki from the repository's **top-level**
-  `AGENTS.md` / `CLAUDE.md` — never nested `AGENTS.md`/`CLAUDE.md` files.
-- Do not hand-write the block. Run `scripts/inject-pointer.sh`, which creates
-  or updates a marker-delimited block idempotently (safe to re-run) and
-  preserves the surrounding content.
-- On update runs, re-run `scripts/inject-pointer.sh` so a repository that
-  gained an `AGENTS.md`/`CLAUDE.md` since init picks up the block; it no-ops
-  when the block is already present.
-- Do not make formatting-only edits to these files.
+```markdown
+## OpenWiki
+
+This repository has documentation located in the /openwiki directory.
+
+Start here:
+- [OpenWiki quickstart](openwiki/quickstart.md)
+
+OpenWiki includes repository overview, architecture notes, workflows, domain concepts, operations, integrations, testing guidance, and source maps.
+
+When working in this repository, read the OpenWiki quickstart first, then follow its links to the relevant architecture, workflow, domain, operation, and testing notes.
+```
 
 ## Security and privacy rules
 
@@ -164,12 +169,13 @@ filesystem to Claude Code's real tools:
 - Leading-slash openwiki path.
   - matches `\/openwiki`
 
-Two sections need more than a vocabulary swap:
+Two more rules beyond the vocabulary swap:
 
 - `OpenWiki CLI reference:` is **dropped** — its subject, the `openwiki` CLI flag
   surface, is out of wijzer's parity scope, since wijzer's runtime is Claude Code
   skills (`/wijzer:init`, `:update`, `:ask`), not a CLI.
-- `Root agent instruction files:` is **adapted** — OpenWiki has the agent
-  hand-write an `## OpenWiki` pointer block; wijzer writes a marker-delimited
-  block deterministically with `scripts/inject-pointer.sh`, so the parity-relevant
-  rules are kept but the write mechanism and embedded block are replaced.
+- Fenced ```code blocks are **preserved verbatim** — not translated and not
+  residual-vocab-checked. The `## OpenWiki` pointer block under "Root agent
+  instruction files" is the exact literal the agent must reproduce byte-for-byte
+  into a repository's AGENTS.md/CLAUDE.md, so it keeps OpenWiki's own `/openwiki`
+  path for an interchangeable wiki.
