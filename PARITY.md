@@ -28,7 +28,7 @@ living record of what that means and how it is verified.
 | `openwiki --update [msg]` | `/wijzer:update [msg]` skill | `tests/parity-crossvalidate.test.ts` + Phase-3 scenarios |
 | chat mode (Q&A, no writes) | `/wijzer:ask` skill | manual: assert zero wiki writes |
 | `--print` non-interactive | `claude -p "/wijzer:update"` | headless recipe (Phase 4) |
-| plain-MD pages, no frontmatter, source-map at page end, ≤8 pages on init | `references/wiki-format.md` | format checklist vs upstream `openwiki/` |
+| plain-MD pages, no frontmatter, source-map at page end, ≤8 pages on init | `references/wiki-format.md` + `scripts/check-format.sh` gate in init/update | `tests/check-format.test.ts` + golden run vs upstream `openwiki/` |
 | `.last-update.json` = {updatedAt, command, gitHead?, model} | `scripts/write-state.sh` | `tests/state.test.ts` (CLI contract) + `tests/parity-crossvalidate.test.ts` (real-function interchange) |
 | no-op: (no msg AND HEAD==state) OR only `openwiki/` changed; force when dirty | `scripts/check-noop.sh` (ports `getUpdateNoopStatus` + `shouldCheckUpdateNoop`) | `tests/parity-crossvalidate.test.ts` runs bash vs the vendored real functions; `vendor/openwiki/test/update-noop.test.ts` runs verbatim against the vendored source |
 | surgical edits: ≤1–2 pages when <5 files changed | `references/disciplines.md` + `scripts/diff-summary.sh` | Phase-3 scenario |
@@ -37,6 +37,17 @@ living record of what that means and how it is verified.
 | run/subagent/planning/git disciplines (`src/agent/prompt.ts`) | `references/disciplines.md` + `agents/wiki-scout.md` | prompt review (this doc) |
 | idempotent AGENTS.md/CLAUDE.md block | `scripts/inject-pointer.sh` | `tests/inject.test.ts` |
 | GH Action: cron 8am → update → PR `openwiki/update` | `examples/github-action.yml` (via anthropics/claude-code-action, subscription OAuth) | Phase-4 live run |
+
+## Watch items
+
+- **State-file parsing seam.** `scripts/check-noop.sh` extracts `gitHead` from
+  `openwiki/.last-update.json` with `sed`, not a JSON parser (the scripts are
+  dependency-free by design). This is the one place interchangeability depends
+  on parsing JSON that *OpenWiki* may have written. Mitigated by
+  `tests/parity-crossvalidate.test.ts`, which runs `check-noop.sh` over state
+  files the vendored real OpenWiki functions produce; if upstream ever changes
+  its serializer (multi-line output, key reordering across lines), re-check this
+  seam first during re-validation.
 
 ## Re-validation procedure (when parity-watch fires)
 
