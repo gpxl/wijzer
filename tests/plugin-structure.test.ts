@@ -93,6 +93,29 @@ describe("skills", () => {
     const md = await read("skills", "update", "SKILL.md");
     expect(md).toContain("--dry-run");
   });
+
+  // The write-capable skills may run git only for read-only history inspection.
+  // Their allowed-tools must NOT carry a broad `Bash(git *)` / `Bash(git:*)`
+  // catch-all that would let the model run `git commit`/`git push`/`git checkout`
+  // directly — those belong to the agent pipeline, not the skill. This locks the
+  // doctrine so a future edit can't silently re-widen the git allowlist.
+  for (const name of ["init", "update"] as const) {
+    test(`${name} allowed-tools has no broad git catch-all and cannot commit/push`, async () => {
+      const md = await read("skills", name, "SKILL.md");
+      const { fm } = splitFrontmatter(md);
+      const allowed = fmField(fm, "allowed-tools") ?? "";
+      // No wildcard-only git grant in either specifier style.
+      expect(allowed).not.toMatch(/Bash\(git\s*\*\)/); // `Bash(git *)`
+      expect(allowed).not.toMatch(/Bash\(git:\*\)/); // `Bash(git:*)`
+      // No mutating git subcommand is granted.
+      expect(allowed).not.toMatch(/Bash\(git commit/);
+      expect(allowed).not.toMatch(/Bash\(git push/);
+      expect(allowed).not.toMatch(/Bash\(git checkout/);
+      // The read-only subset the disciplines actually need is present.
+      expect(allowed).toMatch(/Bash\(git log:\*\)/);
+      expect(allowed).toMatch(/Bash\(git show:\*\)/);
+    });
+  }
 });
 
 describe("wiki-scout agent", () => {
@@ -103,6 +126,30 @@ describe("wiki-scout agent", () => {
     const tools = fmField(fm, "tools") ?? "";
     expect(tools).not.toMatch(/\bWrite\b/);
     expect(tools).not.toMatch(/\bEdit\b/);
+  });
+
+  test("runs on the durable 'sonnet' model alias, not a pinned dated id", async () => {
+    const md = await read("agents", "wiki-scout.md");
+    const { fm } = splitFrontmatter(md);
+    // Durable alias so the scout tracks the current Sonnet without a version bump.
+    expect(fmField(fm, "model")).toBe("sonnet");
+  });
+
+  test("its Bash use is bounded to non-mutating commands by the agent prose", async () => {
+    // Agent `tools:` frontmatter accepts only bare tool names — it cannot carry
+    // per-command permission specifiers like a skill's allowed-tools can — so
+    // the scout lists a bare `Bash`. The enforcement that keeps it read-only is
+    // the explicit non-mutation contract in its body, which this asserts stays
+    // present (and that no write tools leaked into `tools:`).
+    const md = await read("agents", "wiki-scout.md");
+    const { fm, body } = splitFrontmatter(md);
+    const tools = fmField(fm, "tools") ?? "";
+    expect(tools).not.toMatch(/\bWrite\b/);
+    expect(tools).not.toMatch(/\bEdit\b/);
+    // The body must forbid the mutating git operations and file writes.
+    expect(body).toMatch(/Read-only/);
+    expect(body).toMatch(/git add\/commit\/checkout/);
+    expect(body).toMatch(/non-mutating/);
   });
 });
 
