@@ -15,5 +15,25 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   is a case-for-case port of OpenWiki's `test/update-noop.test.ts` (the executable
   parity spec). CI runs shellcheck + tests on macOS and Linux.
 - `PARITY.md` pinning the validated upstream OpenWiki commit and the mapping table.
-
-<!-- Phases 2–5 (skills, update/churn, integration surface, release) land here. -->
+- **Phase 2 — init skill.** `/wijzer:init [focus]` (`skills/init/SKILL.md`) that
+  runs the deterministic inventory, optionally fans out read-only `wiki-scout`
+  subagents (`agents/wiki-scout.md`), plans via `openwiki/_plan.md`, writes the
+  wiki, injects the `AGENTS.md`/`CLAUDE.md` pointer, and records state. The
+  parity contract is captured in `references/wiki-format.md` (page format, source
+  maps, ≤8-page ceiling) and `references/disciplines.md` (run / subagent /
+  planning / git / surgical-edit disciplines).
+- **Phase 3 — update skill + churn prevention.** `/wijzer:update [--dry-run]
+  [instruction]` (`skills/update/SKILL.md`) with the two-gate no-op flow
+  (preflight `check-noop` + before/after content snapshot) so unchanged runs
+  write nothing. `references/state-schema.md` documents the interchangeable
+  `.last-update.json` schema.
+- **Phase 4 — integration surface.** `/wijzer:ask <question>`
+  (`skills/ask/SKILL.md`, structurally read-only) with source-map citations;
+  `examples/github-action.yml` (scheduled subscription-OAuth refresh → PR) and
+  `examples/headless.md` (`claude -p` recipes); and
+  `.github/workflows/parity-watch.yml`, which opens a tracking issue when
+  upstream OpenWiki's spec-bearing files drift from the pinned commit.
+- A `tests/plugin-structure.test.ts` suite asserting the plugin hangs together:
+  skill frontmatter, read-only guarantees for `ask`/`wiki-scout`, that every
+  bundled path a skill references exists, and that `parity-watch` pins the same
+  SHA as `PARITY.md`.

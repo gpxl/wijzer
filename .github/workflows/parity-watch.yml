@@ -1,0 +1,120 @@
+name: parity-watch
+
+# Watches the spec-bearing files in upstream OpenWiki. When any of them drift
+# from the commit wijzer last validated against (the pin in PARITY.md), open (or
+# refresh) a tracking issue so a human can run the re-validation procedure and
+# bump the pin. wijzer never claims parity it hasn't re-proven.
+
+on:
+  schedule:
+    - cron: "0 8 * * 1" # Mondays 08:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  UPSTREAM: langchain-ai/openwiki
+  # Keep this in sync with "Upstream validated against" in PARITY.md.
+  PINNED_SHA: 23428de0cc0b1b6d3e5d09be413e92a5d6ee451f
+  # The files whose change means the spec changed. Ports of these drive parity:
+  #   test/update-noop.test.ts  -> tests/noop.test.ts
+  #   src/agent/utils.ts        -> scripts/check-noop.sh
+  #   src/agent/prompt.ts       -> references/disciplines.md, agents/wiki-scout.md
+  SPEC_FILES: "test/update-noop.test.ts src/agent/utils.ts src/agent/prompt.ts"
+  # The reference wiki folder that defines the output format.
+  REFERENCE_DIR: "openwiki"
+  ISSUE_TITLE: "parity-watch: upstream OpenWiki spec changed"
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve upstream main SHA
+        id: up
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          sha=$(gh api "repos/$UPSTREAM/commits/main" --jq .sha)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Upstream main is at $sha (pinned: $PINNED_SHA)"
+
+      - name: Compare spec files against the pin
+        id: diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UP_SHA: ${{ steps.up.outputs.sha }}
+        run: |
+          set -euo pipefail
+
+          # git blob SHA changes iff file content changes — an exact drift signal.
+          blob_sha() { gh api "repos/$UPSTREAM/contents/$1?ref=$2" --jq '.sha' 2>/dev/null || echo "MISSING"; }
+
+          # A stable digest over every blob under a directory, so any add/remove/
+          # edit in the reference folder is detected as one signal.
+          dir_digest() {
+            gh api "repos/$UPSTREAM/git/trees/$2?recursive=1" \
+              --jq ".tree[] | select(.type==\"blob\" and (.path|startswith(\"$1/\"))) | \"\(.path) \(.sha)\"" \
+              | LC_ALL=C sort | sha256sum | awk '{print $1}'
+          }
+
+          changed=""
+          for f in $SPEC_FILES; do
+            old=$(blob_sha "$f" "$PINNED_SHA")
+            new=$(blob_sha "$f" "$UP_SHA")
+            if [ "$old" != "$new" ]; then
+              changed="${changed}- \`$f\` — blob \`${old:0:12}\` → \`${new:0:12}\`"$'\n'
+            fi
+          done
+
+          old_ref=$(dir_digest "$REFERENCE_DIR" "$PINNED_SHA")
+          new_ref=$(dir_digest "$REFERENCE_DIR" "$UP_SHA")
+          if [ "$old_ref" != "$new_ref" ]; then
+            changed="${changed}- \`$REFERENCE_DIR/\` reference wiki — folder digest changed"$'\n'
+          fi
+
+          if [ -n "$changed" ]; then
+            {
+              echo "changed=true"
+              echo "body<<PARITY_EOF"
+              echo "Upstream OpenWiki spec-bearing files changed since the pinned commit."
+              echo ""
+              echo "- **Pinned (validated):** \`$PINNED_SHA\`"
+              echo "- **Upstream main now:** \`$UP_SHA\`"
+              echo ""
+              echo "### Changed"
+              echo ""
+              printf '%s' "$changed"
+              echo ""
+              echo "### Next steps"
+              echo ""
+              echo "Run the re-validation procedure in [PARITY.md](../blob/main/PARITY.md):"
+              echo "port any changed no-op cases, re-diff the wiki format if it moved,"
+              echo "then bump the pin (this file's \`PINNED_SHA\` and PARITY.md) and note it in CHANGELOG.md."
+              echo "PARITY_EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No spec drift; parity pin is current."
+          fi
+
+      - name: Open or refresh the tracking issue
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          BODY: ${{ steps.diff.outputs.body }}
+        run: |
+          set -euo pipefail
+          existing=$(gh issue list --state open --search "in:title $ISSUE_TITLE" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$BODY"
+            echo "Refreshed existing tracking issue #$existing"
+          else
+            # Ensure the label exists so --label can't fail the run.
+            gh label create parity --color BFD4F2 --description "OpenWiki parity" 2>/dev/null || true
+            gh issue create --title "$ISSUE_TITLE" --body "$BODY" --label parity
+            echo "Opened a new tracking issue"
+          fi

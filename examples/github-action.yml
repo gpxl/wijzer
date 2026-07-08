@@ -1,0 +1,64 @@
+# Scheduled wijzer refresh — keeps openwiki/ current and opens a PR with the diff.
+#
+# Copy this into the repository you want documented, at
+# .github/workflows/wiki-refresh.yml, then add ONE secret:
+#
+#   CLAUDE_CODE_OAUTH_TOKEN  — generate locally with `claude setup-token`
+#                              (Claude Pro/Max subscription; NO API key needed).
+#
+# It installs the wijzer plugin into the CI run, invokes /wijzer:update, and — if
+# the wiki actually changed — commits to the `openwiki/update` branch and opens a
+# pull request. wijzer's churn prevention means an unchanged run writes nothing,
+# so no empty PRs.
+
+name: wiki-refresh
+
+on:
+  schedule:
+    - cron: "0 8 * * *" # every day at 08:00 UTC
+  workflow_dispatch: {} # allow manual runs
+
+permissions:
+  contents: write # commit the refreshed wiki + push the branch
+  pull-requests: write # open/update the PR
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history — wijzer reads git to scope the update
+
+      - name: Refresh the wiki with wijzer
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          # Install the wijzer plugin so /wijzer:update is available in the run.
+          plugin_marketplaces: |
+            https://github.com/gpxl/wijzer
+          plugins: |
+            wijzer@wijzer
+
+          # Non-interactive instruction. wijzer does the wiki work; we ask Claude
+          # to open a PR only when there's a real change to ship.
+          prompt: |
+            Run /wijzer:update to refresh this repository's openwiki/ wiki from
+            recent changes.
+
+            Then, using git:
+            - If /wijzer:update reported the wiki is already current (a no-op) or
+              left no working-tree changes, do nothing further and stop.
+            - Otherwise, create a branch named `openwiki/update` (reset it to the
+              current commit if it already exists), commit the changed files with
+              the message "docs: refresh openwiki wiki", push it, and open a pull
+              request into the default branch titled "Refresh openwiki wiki".
+              If a PR from that branch is already open, just push to update it.
+
+          # Grant only what the job needs: the wijzer scripts, git, and gh.
+          claude_args: |
+            --allowedTools "Bash(git:*),Bash(gh:*),Edit,Write,Read,Glob,Grep,Task"
+        env:
+          # gh CLI uses this to open the PR.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
