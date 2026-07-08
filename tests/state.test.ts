@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
 import {
@@ -77,50 +77,12 @@ describe("write-state.sh", () => {
     expect(verdict.noop).toBe(true);
   });
 
-  test("cross-compat: check-noop.sh reads a state file written by real OpenWiki", async () => {
-    const repo = await createRepoWithOpenWiki();
-    const head = await git(repo, ["rev-parse", "HEAD"]);
-    // Byte-shaped exactly like OpenWiki's writeLastUpdateMetadata output
-    // (2-space pretty JSON, trailing newline, key order updatedAt/command/
-    // gitHead/model). If our parser only accepted our own serialization this
-    // would fail — proving the interchangeability guarantee.
-    const openwikiState = `${JSON.stringify(
-      {
-        updatedAt: "2026-06-30T21:20:03.130Z",
-        command: "update",
-        gitHead: head,
-        model: "accounts/fireworks/models/glm-5p2",
-      },
-      null,
-      2,
-    )}\n`;
-    await writeFile(
-      path.join(repo, "openwiki", ".last-update.json"),
-      openwikiState,
-      "utf8",
-    );
-
-    const verdict = await runScriptJson<NoopVerdict>("check-noop.sh", repo);
-    expect(verdict.stateGitHead).toBe(head);
-    expect(verdict.noop).toBe(true);
-  });
-
-  test("cross-compat: a state file we wrote parses as the OpenWiki schema", async () => {
-    const repo = await createRepoWithOpenWiki();
-    await runScriptJson<WriteResult>("write-state.sh", repo, [
-      "--command",
-      "update",
-      "--model",
-      "claude-opus-4-8",
-    ]);
-    const parsed = JSON.parse(
-      await readFile(path.join(repo, "openwiki", ".last-update.json"), "utf8"),
-    );
-    // The three fields OpenWiki's readLastUpdate requires to be strings.
-    expect(typeof parsed.updatedAt).toBe("string");
-    expect(["init", "update"]).toContain(parsed.command);
-    expect(typeof parsed.model).toBe("string");
-  });
+  // Cross-tool interchange (state written by real OpenWiki read by our
+  // check-noop.sh, and vice versa) now lives in tests/parity-crossvalidate.ts,
+  // exercised against the real vendored writeLastUpdateMetadata/getUpdateNoopStatus
+  // rather than a hand-shaped JSON approximation. This file keeps only the
+  // wijzer-specific write-state.sh CLI contract (arg validation, envelope, model
+  // fallback, second-precision timestamp).
 
   test("noop-then-write leaves check-noop still a no-op (churn prevention shape)", async () => {
     const repo = await createRepoWithOpenWiki();
