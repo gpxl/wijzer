@@ -24,19 +24,19 @@ living record of what that means and how it is verified.
 
 | OpenWiki behavior (upstream) | wijzer mechanism | Verified by |
 |---|---|---|
-| `openwiki --init [msg]` | `/wijzer:init [msg]` skill | golden run (Phase 2) vs their committed `openwiki/` |
-| `openwiki --update [msg]` | `/wijzer:update [msg]` skill | `tests/parity-crossvalidate.test.ts` + Phase-3 scenarios |
-| chat mode (Q&A, no writes) | `/wijzer:ask` skill | manual: assert zero wiki writes |
-| `--print` non-interactive | `claude -p "/wijzer:update"` | headless recipe (Phase 4) |
-| plain-MD pages, no frontmatter, source-map at page end, ≤8 pages on init | `references/wiki-format.md` + `scripts/check-format.sh` gate in init/update | `tests/check-format.test.ts` + golden run vs upstream `openwiki/` |
+| `openwiki --init [msg]` | `/wijzer:init [msg]` skill | golden `/wijzer:init` run + `scripts/check-format.sh` gate (`tests/check-format.test.ts`) |
+| `openwiki --update [msg]` | `/wijzer:update [msg]` skill | `tests/parity-crossvalidate.test.ts` (no-op/snapshot vs the real functions) + golden update run |
+| chat mode (Q&A, no writes) | `/wijzer:ask` skill | `tests/plugin-structure.test.ts` (ask is structurally read-only) |
+| `--print` non-interactive | `claude -p "/wijzer:update"` | `examples/headless.md` recipe |
+| plain-MD pages, no frontmatter, source-map at page end, ≤8 pages on init | `references/wiki-format.md` + `scripts/check-format.sh` gate in init/update | `tests/check-format.test.ts` (format-gate enforcement) + golden-run conformance |
 | `.last-update.json` = {updatedAt, command, gitHead?, model} | `scripts/write-state.sh` | `tests/state.test.ts` (CLI contract) + `tests/parity-crossvalidate.test.ts` (real-function interchange) |
 | no-op: (no msg AND HEAD==state) OR only `openwiki/` changed; force when dirty | `scripts/check-noop.sh` (ports `getUpdateNoopStatus` + `shouldCheckUpdateNoop`) | `tests/parity-crossvalidate.test.ts` runs bash vs the vendored real functions; `vendor/openwiki/test/update-noop.test.ts` runs verbatim against the vendored source |
-| git evidence (`git status`/`log <range>`/`diff`) → surgical edits: ≤1–2 pages when <5 files changed | `references/disciplines.md` (git discipline) — **prompt-driven**: the update skill runs the same commands and the same `gitHead` → `updatedAt` → recent-history fallback as OpenWiki's `createGitSummary`, reading the baseline from `openwiki/.last-update.json` | Phase-3 scenario |
+| git evidence (`git status`/`log <range>`/`diff`) → surgical edits: ≤1–2 pages when <5 files changed | `references/disciplines.md` (git discipline) — **prompt-driven**: the update skill runs the same commands and the same `gitHead` → `updatedAt` → recent-history fallback as OpenWiki's `createGitSummary`, reading the baseline from `openwiki/.last-update.json` | git discipline drift-locked in `tests/build-disciplines.test.ts`; commands mirror `createGitSummary` (`vendor/openwiki/src/agent/utils.ts`) |
 | SHA-256 snapshot; write state only if content changed | `scripts/snapshot.sh` (`dir:`/`file:` frames match real byte-for-byte) + update-skill gate | `tests/snapshot.test.ts` (envelope) + `tests/parity-crossvalidate.test.ts` (digest equals real) |
 | init: discover → `_plan.md` → generate → delete plan → state | **prompt-driven** discovery (run discipline) + init skill; no bash inventory step (OpenWiki has none) | golden run |
 | run/subagent/planning/git disciplines (`src/agent/prompt.ts`) | `references/disciplines.md` + `references/wiki-format.md` (both **generated** from the vendored `prompt.ts` by `scripts/build-disciplines.mjs`) + `agents/wiki-scout.md` | `tests/build-disciplines.test.ts` — drift-locked: the committed docs must equal a fresh regenerate, so an upstream prompt change fails CI until re-derived |
 | exact `## OpenWiki` block in AGENTS.md/CLAUDE.md | **prompt-driven**: the agent writes OpenWiki's verbatim `## OpenWiki` section (preserved byte-for-byte in `references/disciplines.md`) — no bash injector | `tests/build-disciplines.test.ts` (block derived verbatim) |
-| GH Action: cron 8am → update → PR `openwiki/update` | `examples/github-action.yml` (via anthropics/claude-code-action, subscription OAuth) | Phase-4 live run |
+| GH Action: cron 8am → update → PR `openwiki/update` | `examples/github-action.yml` (via anthropics/claude-code-action, subscription OAuth) | manual live run |
 
 ## Watch items
 

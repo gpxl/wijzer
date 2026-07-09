@@ -76,3 +76,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     literals are exempt from vocabulary translation and the residual-vocab guard).
     This reverses P2C's inject-pointer.sh adaptation.
   - `agents/wiki-scout.md` is aligned to the generated subagent discipline.
+- **P2E — parity reconciliation.** Squared the docs and tests with the vendored-
+  real-code reality: `PARITY.md`'s verification column now cites the actual
+  verifiers (`tests/parity-crossvalidate.test.ts`, the verbatim vendored
+  `update-noop.test.ts`, `tests/build-disciplines.test.ts` drift-lock,
+  `tests/check-format.test.ts`) instead of aspirational "Phase N" runs.
+  `.github/workflows/parity-watch.yml` now watches the full vendored spec set
+  (adds `src/constants.ts` + `src/agent/types.ts`), drops the stale
+  `tests/noop.test.ts` mapping, and drives the re-vendor → regenerate → `npm test`
+  flow on a SHA bump. Trimmed the two parity-*restatement* assertions from
+  `tests/plugin-structure.test.ts` (per the parity-first principle: the ≤8-page
+  and <5-files→1–2-pages numbers are pinned in `tests/build-disciplines.test.ts`
+  against drift-locked docs, and `## Source map` / `Git evidence:` are enforced in
+  `tests/check-format.test.ts`). `README.md` now states Node is a dev/CI-only
+  dependency — the plugin needs no `node` at user runtime.

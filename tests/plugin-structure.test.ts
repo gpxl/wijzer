@@ -187,20 +187,14 @@ describe("reference doctrine", () => {
     }
   });
 
-  test("wiki-format.md encodes the parity-load-bearing literals", async () => {
-    const md = await read("references", "wiki-format.md");
-    expect(md).toContain("openwiki/quickstart.md");
-    expect(md).toContain("## Source map");
-    expect(md).toContain("Git evidence: commits");
-    expect(md).toMatch(/at most\s+\*?\*?8/); // ≤8 pages init ceiling
-  });
-
-  test("disciplines.md keeps the surgical-edit budget numbers", async () => {
-    const md = await read("references", "disciplines.md");
-    // "fewer than ~5 changed files → at most 1–2 pages"
-    expect(md).toMatch(/\b5\b/);
-    expect(md).toMatch(/1[–-]2/);
-  });
+  // Parity-first (wj-1s6): we do NOT re-assert that wijzer's own docs restate the
+  // OpenWiki spec values here — that would test wijzer's restatement, not parity.
+  // The spec values are guarded where they are actually derived/enforced:
+  //   - the ≤8-page ceiling and the <5-files→1–2-pages budget: pinned in
+  //     tests/build-disciplines.test.ts ("parity numbers survive derivation"),
+  //     against docs drift-locked to the vendored prompt.ts;
+  //   - the `## Source map` heading and `Git evidence: commits` bullet: enforced
+  //     and tested in tests/check-format.test.ts (the format gate).
 });
 
 describe("integration surface", () => {
