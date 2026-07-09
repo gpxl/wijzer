@@ -7,6 +7,7 @@
     "url": "https://github.com/gpxl"
   },
   "homepage": "https://github.com/gpxl/wijzer",
+  "repository": "https://github.com/gpxl/wijzer",
   "license": "MIT",
   "keywords": [
     "documentation",
