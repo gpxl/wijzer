@@ -1,5 +1,6 @@
 {
   "name": "wijzer",
+  "description": "wijzer — an OpenWiki-format agent wiki for your codebase, powered by your Claude subscription.",
   "owner": {
     "name": "Gerlando Piro",
     "url": "https://github.com/gpxl"
@@ -8,7 +9,17 @@
     {
       "name": "wijzer",
       "source": "./",
-      "description": "Generate and maintain an OpenWiki-format agent wiki for your codebase, refreshed from git diffs — powered by your Claude subscription, no API keys."
+      "description": "Generate and maintain an OpenWiki-format agent wiki for your codebase, refreshed from git diffs — powered by your Claude subscription, no API keys.",
+      "homepage": "https://github.com/gpxl/wijzer",
+      "repository": "https://github.com/gpxl/wijzer",
+      "license": "MIT",
+      "category": "documentation",
+      "keywords": [
+        "documentation",
+        "wiki",
+        "openwiki",
+        "codebase-docs"
+      ]
     }
   ]
 }
