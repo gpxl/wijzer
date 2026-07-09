@@ -18,11 +18,15 @@ env:
   UPSTREAM: langchain-ai/openwiki
   # Keep this in sync with "Upstream validated against" in PARITY.md.
   PINNED_SHA: 23428de0cc0b1b6d3e5d09be413e92a5d6ee451f
-  # The files whose change means the spec changed. Ports of these drive parity:
-  #   test/update-noop.test.ts  -> tests/noop.test.ts
-  #   src/agent/utils.ts        -> scripts/check-noop.sh
-  #   src/agent/prompt.ts       -> references/disciplines.md, agents/wiki-scout.md
-  SPEC_FILES: "test/update-noop.test.ts src/agent/utils.ts src/agent/prompt.ts"
+  # The spec-bearing files wijzer vendors at the pinned SHA into vendor/openwiki/.
+  # A change to any of them means the spec moved; each is verified against real
+  # vendored code, not a hand-port:
+  #   test/update-noop.test.ts  -> run verbatim from vendor/ + tests/parity-crossvalidate.test.ts
+  #   src/agent/utils.ts        -> scripts/check-noop.sh + snapshot.sh (cross-validated vs the real functions)
+  #   src/agent/prompt.ts       -> references/disciplines.md + wiki-format.md (generated) + agents/wiki-scout.md
+  #   src/constants.ts          -> OPEN_WIKI_DIR / UPDATE_METADATA_PATH used across scripts + generator
+  #   src/agent/types.ts        -> references/state-schema.md field set (locked to UpdateMetadata)
+  SPEC_FILES: "test/update-noop.test.ts src/agent/utils.ts src/agent/prompt.ts src/constants.ts src/agent/types.ts"
   # The reference wiki folder that defines the output format.
   REFERENCE_DIR: "openwiki"
   ISSUE_TITLE: "parity-watch: upstream OpenWiki spec changed"
@@ -91,7 +95,9 @@ jobs:
               echo "### Next steps"
               echo ""
               echo "Run the re-validation procedure in [PARITY.md](../blob/main/PARITY.md):"
-              echo "port any changed no-op cases, re-diff the wiki format if it moved,"
+              echo "re-vendor at the new SHA (\`scripts/vendor-openwiki.sh --sha <new>\`),"
+              echo "re-derive the generated docs (\`node scripts/build-disciplines.mjs\`),"
+              echo "run \`npm test\` (the vendored \`update-noop.test.ts\` + cross-validation re-prove parity),"
               echo "then bump the pin (this file's \`PINNED_SHA\` and PARITY.md) and note it in CHANGELOG.md."
               echo "PARITY_EOF"
             } >> "$GITHUB_OUTPUT"

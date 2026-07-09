@@ -66,13 +66,28 @@ verified, and [`CONTRIBUTING`](#contributing) below to hack on it.
 
 - Claude Code with an active Claude subscription.
 - `git` and a POSIX shell. On Windows, use Git Bash or WSL.
+- **No Node.js at runtime.** The plugin is skills + dependency-free bash; nothing
+  it runs for you needs `node`. Node is a **development/CI-only** dependency —
+  it's used to run the Vitest suite and to regenerate `references/disciplines.md`
+  and `references/wiki-format.md` from the vendored OpenWiki prompt (the committed
+  output ships in the plugin, so you never run the generator).
 
 ## Contributing
 
+Node is needed here (dev/CI only), not by end users:
+
 ```
 npm install
-npm test          # runs the deterministic script suite against temp git repos
+npm test          # Vitest: scripts vs temp git repos + the vendored OpenWiki parity tests
 npm run lint      # shellcheck
+```
+
+When OpenWiki evolves, re-derive the generated doctrine and re-prove parity:
+
+```
+scripts/vendor-openwiki.sh --sha <new>        # re-vendor the spec at a new SHA
+node scripts/build-disciplines.mjs            # regenerate the reference docs
+npm test                                      # cross-validation re-proves parity
 ```
 
 Contributions welcome — especially parity fixes when OpenWiki evolves (see the
