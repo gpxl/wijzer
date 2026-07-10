@@ -42,6 +42,82 @@ describe("plugin manifests", () => {
     const names = market.plugins.map((x: { name: string }) => x.name);
     expect(names).toContain("wijzer");
   });
+
+  // Discovery metadata (keywords, license, repository, homepage, description) is
+  // declared in BOTH .claude-plugin/plugin.json and the marketplace.json plugin
+  // entry. Claude Code reads the marketplace entry for the browse/discovery
+  // listing and plugin.json for the installed plugin — for a local-path plugin
+  // (`source: "./"`) neither inherits from the other — so the duplication is
+  // platform-required and can't be deduped. What it can't carry on its own is a
+  // drift guard: this repo already drift-locks duplicated content elsewhere
+  // (references/ docs derived from the vendored prompt, pinned by
+  // build-disciplines.test), and the two discovery surfaces get the same
+  // treatment here so a metadata edit to one manifest can't silently diverge the
+  // other.
+  test("marketplace entry and plugin.json agree on shared discovery metadata", async () => {
+    const plugin = JSON.parse(await read(".claude-plugin", "plugin.json"));
+    const market = JSON.parse(await read(".claude-plugin", "marketplace.json"));
+    const entry = market.plugins.find(
+      (x: { name: string }) => x.name === "wijzer",
+    );
+    expect(entry, "marketplace.json has no 'wijzer' plugin entry").toBeTruthy();
+
+    // These must be byte-identical or the browse listing drifts from the
+    // installed plugin.
+    expect(entry.homepage).toBe(plugin.homepage);
+    expect(entry.repository).toBe(plugin.repository);
+    expect(entry.license).toBe(plugin.license);
+    expect(entry.keywords).toEqual(plugin.keywords);
+
+    // The entry description is the canonical plugin.json description minus its
+    // trailing command-list sentence, so plugin.json's must start with it. This
+    // catches a wording change to one that isn't mirrored in the other.
+    expect(
+      plugin.description.startsWith(entry.description),
+      "plugin.json description must extend the marketplace entry description",
+    ).toBe(true);
+  });
+
+  // package.json is the third manifest carrying the same discovery keywords, plus
+  // npm-flavoured extras (claude-code, claude-code-plugin, agents). It's a
+  // superset by design, but the shared keys must not drift: every keyword the
+  // plugin manifests advertise has to exist in package.json too, and the license
+  // is one value across all three, or the distribution channels disagree about
+  // what the plugin is.
+  test("package.json is a consistent superset of the plugin manifest metadata", async () => {
+    const pkg = JSON.parse(await read("package.json"));
+    const plugin = JSON.parse(await read(".claude-plugin", "plugin.json"));
+    for (const kw of plugin.keywords as string[]) {
+      expect(
+        pkg.keywords,
+        `package.json keywords missing '${kw}' advertised by the plugin manifests`,
+      ).toContain(kw);
+    }
+    expect(pkg.license).toBe(plugin.license);
+  });
+
+  // All descriptions are hand-written prose for different surfaces (npm package,
+  // installed plugin, marketplace catalog, marketplace entry) so they legitimately
+  // differ in length and framing — but none may drift into describing a
+  // *different* product. Lock the load-bearing identity phrases so a careless
+  // rewrite of one can't silently diverge from the others.
+  test("every manifest description names the OpenWiki wiki and the subscription", async () => {
+    const pkg = JSON.parse(await read("package.json"));
+    const plugin = JSON.parse(await read(".claude-plugin", "plugin.json"));
+    const market = JSON.parse(await read(".claude-plugin", "marketplace.json"));
+    const entry = market.plugins.find(
+      (x: { name: string }) => x.name === "wijzer",
+    );
+    for (const desc of [
+      pkg.description,
+      plugin.description,
+      market.description,
+      entry.description,
+    ] as string[]) {
+      expect(desc).toMatch(/OpenWiki-format agent wiki/);
+      expect(desc).toMatch(/Claude subscription/);
+    }
+  });
 });
 
 describe("skills", () => {
