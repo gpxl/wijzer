@@ -98,4 +98,4 @@ re-validation procedure in [PARITY.md](PARITY.md)).
 MIT. wijzer is an independent reimplementation and ships none of OpenWiki's
 source; the wiki format, state schema, update algorithm, prompt disciplines, and
 test structure are adapted from OpenWiki (MIT, © LangChain, Inc.) — see the
-attribution in [LICENSE](LICENSE).
+attribution in [NOTICE](NOTICE).

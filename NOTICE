@@ -1,0 +1,13 @@
+wijzer — NOTICE
+
+This product includes work adapted from OpenWiki.
+
+wijzer reaches format and behavior parity with OpenWiki
+(https://github.com/langchain-ai/openwiki, MIT License, Copyright (c)
+LangChain, Inc.). The wiki output format, the `.last-update.json` state schema,
+the update no-op / churn-prevention algorithm, the content-snapshot approach,
+the prompt disciplines, and the structure of the test suite are adapted from
+that project. wijzer is an independent reimplementation as a Claude Code plugin
+and ships none of OpenWiki's source; it carries this notice in gratitude and to
+document lineage. The upstream commit validated against is recorded in
+PARITY.md.
