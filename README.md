@@ -95,7 +95,9 @@ re-validation procedure in [PARITY.md](PARITY.md)).
 
 ## License & lineage
 
-MIT. wijzer is an independent reimplementation and ships none of OpenWiki's
-source; the wiki format, state schema, update algorithm, prompt disciplines, and
-test structure are adapted from OpenWiki (MIT, © LangChain, Inc.) — see the
+MIT. wijzer is an independent reimplementation; none of OpenWiki's source runs in
+its runtime (skills + bash). The wiki format, state schema, update algorithm,
+prompt disciplines, and test structure are adapted from OpenWiki (MIT, © LangChain,
+Inc.), and a pinned snapshot of a few OpenWiki files is vendored under
+[vendor/openwiki/](vendor/openwiki/) for dev/CI parity verification — see the
 attribution in [NOTICE](NOTICE).
