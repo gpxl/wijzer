@@ -1,8 +1,7 @@
 ---
 name: update
-description: Refresh the wijzer/OpenWiki wiki from what changed in the repository since the last run, making surgical edits and no-opping cleanly when nothing meaningful changed. Use when the user runs /wijzer:update or asks to refresh/sync the wiki. Supports --dry-run to preview without writing.
+description: Refresh the wijzer/OpenWiki wiki from what changed in the repository since the last run, making surgical edits and no-opping cleanly when nothing meaningful changed. Use when the user runs /wijzer:update or asks to refresh/sync the wiki — or proactively, once a significant set of changes has landed (new features, architecture or workflow shifts, new modules) that the wiki should reflect, so the docs track the code. The check-noop preflight makes a routine post-change check harmless: when nothing meaningful changed it writes nothing and stops. Supports --dry-run to preview without writing.
 argument-hint: [--dry-run] [instruction]
-disable-model-invocation: true
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/*), Bash(git log:*), Bash(git show:*), Bash(git diff:*), Bash(git status:*), Bash(git blame:*), Bash(git rev-parse:*), Bash(git rev-list:*), Bash(git cat-file:*), Bash(git ls-files:*), Bash(git shortlog:*), Bash(rg *), Read, Grep, Glob, Write, Edit, Task
 ---
 

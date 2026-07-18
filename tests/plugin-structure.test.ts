@@ -52,8 +52,18 @@ describe("skills", () => {
       // name matches the directory so it namespaces as /wijzer:<name>.
       expect(fmField(fm, "name")).toBe(name);
       expect(fmField(fm, "description")).toBeTruthy();
-      // User-only: never auto-triggered by the model.
-      expect(fmField(fm, "disable-model-invocation")).toBe("true");
+      if (name === "update") {
+        // update is model-invocable: it must be able to refresh the wiki
+        // autonomously once significant changes land, so the docs track the
+        // code. Its check-noop preflight makes over-invocation harmless (it
+        // writes nothing when nothing meaningful changed), so it must NOT carry
+        // disable-model-invocation.
+        expect(fmField(fm, "disable-model-invocation")).toBeUndefined();
+      } else {
+        // init (from-scratch bootstrap) and ask (read-only Q&A) stay user-only:
+        // neither should be auto-triggered by the model.
+        expect(fmField(fm, "disable-model-invocation")).toBe("true");
+      }
       expect(fmField(fm, "argument-hint")).toBeTruthy();
     });
   }
